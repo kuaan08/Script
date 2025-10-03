@@ -1,4 +1,4 @@
--- Kauan Mods v1.9 (Fix para abrir menu no Delta + FPS Boost aprimorado)
+-- Kauan Mods v2.2 (Melhorias: FPS Boost com texturas low-poly/massinha + cantos arredondados + Tela Esticada com stretch matrix para simular 4:3 esticado)
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
@@ -13,7 +13,7 @@ ScreenGui.Name = "KauanMods"
 ScreenGui.Parent = PlayerGui
 ScreenGui.ResetOnSpawn = false
 
--- Botão flutuante para abrir o menu (agora com MouseButton1Click para mobile)
+-- Botão flutuante para abrir o menu (agora com MouseButton1Click para mobile + arredondado)
 local FloatButton = Instance.new("TextButton")
 FloatButton.Name = "FloatButton"
 FloatButton.Parent = ScreenGui
@@ -28,7 +28,12 @@ FloatButton.TextSize = 30
 FloatButton.Active = true
 FloatButton.Draggable = true  -- Permite arrastar
 
--- Frame principal (layout menor, altura 160px)
+-- Adicionar cantos arredondados (círculo para o botão flutuante)
+local FloatCorner = Instance.new("UICorner")
+FloatCorner.CornerRadius = UDim.new(0, 25)  -- Raio para círculo (metade do tamanho 50)
+FloatCorner.Parent = FloatButton
+
+-- Frame principal (layout menor, altura 160px + arredondado)
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
@@ -39,6 +44,11 @@ MainFrame.Size = UDim2.new(0, 300, 0, 160)
 MainFrame.Active = true
 MainFrame.Draggable = true
 MainFrame.Visible = false
+
+-- Adicionar cantos arredondados ao frame principal
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 10)  -- Raio arredondado suave
+MainCorner.Parent = MainFrame
 
 -- Título
 local Title = Instance.new("TextLabel")
@@ -52,7 +62,7 @@ Title.Text = "Kauan Mods"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 16
 
--- Botão FPS Boost
+-- Botão FPS Boost (arredondado)
 local FPSButton = Instance.new("TextButton")
 FPSButton.Name = "FPSButton"
 FPSButton.Parent = MainFrame
@@ -65,13 +75,22 @@ FPSButton.Text = "Ativar FPS Boost"
 FPSButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 FPSButton.TextSize = 12
 
--- Função FPS Boost aprimorada (remove lighting + desabilita efeitos visuais extras)
+local FPSCorner = Instance.new("UICorner")
+FPSCorner.CornerRadius = UDim.new(0, 5)
+FPSCorner.Parent = FPSButton
+
+-- Função FPS Boost aprimorada (remove lighting + desabilita efeitos visuais extras + low-poly/massinha)
 local fpsBoostActive = false
 local originalQuality = settings().Rendering.QualityLevel
 local originalShadows = Lighting.GlobalShadows
 local originalFogEnd = Lighting.FogEnd
 local originalBrightness = Lighting.Brightness
+local originalEnvironmentDiffuse = Lighting.EnvironmentDiffuseScale
+local originalEnvironmentSpecular = Lighting.EnvironmentSpecularScale
+local originalShadowSoftness = Lighting.ShadowSoftness
 local originalEffects = {}  -- Salva efeitos do Lighting
+local originalMaterials = {}  -- Salva materiais originais para restauração (para look massinha)
+
 FPSButton.MouseButton1Click:Connect(function()  -- Mudei para MouseButton1Click pra compatibilidade mobile
     fpsBoostActive = not fpsBoostActive
     if fpsBoostActive then
@@ -79,6 +98,9 @@ FPSButton.MouseButton1Click:Connect(function()  -- Mudei para MouseButton1Click 
         originalShadows = Lighting.GlobalShadows
         originalFogEnd = Lighting.FogEnd
         originalBrightness = Lighting.Brightness
+        originalEnvironmentDiffuse = Lighting.EnvironmentDiffuseScale
+        originalEnvironmentSpecular = Lighting.EnvironmentSpecularScale
+        originalShadowSoftness = Lighting.ShadowSoftness
         -- Salva estados dos efeitos
         for _, effect in pairs(Lighting:GetChildren()) do
             if effect:IsA("PostEffect") then
@@ -86,28 +108,51 @@ FPSButton.MouseButton1Click:Connect(function()  -- Mudei para MouseButton1Click 
                 effect.Enabled = false
             end
         end
-        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+        -- Configurações para FPS Boost + look massinha (texturas baixas e materiais plásticos)
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01  -- Texturas mais baixas
         Lighting.GlobalShadows = false
         Lighting.FogEnd = 9e9
         Lighting.Brightness = 0  -- Escurece mais pra boost (ajuste se quiser)
+        Lighting.EnvironmentDiffuseScale = 0  -- Remove difusa para look flat/massinha
+        Lighting.EnvironmentSpecularScale = 0  -- Remove especular para menos brilho
+        Lighting.ShadowSoftness = 0  -- Sombras mais duras e rápidas
+        
+        -- Aplica material plástico a partes visíveis para look "massinha" (clay/low-poly)
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") and obj.Material ~= Enum.Material.Plastic then
+                originalMaterials[obj] = obj.Material
+                obj.Material = Enum.Material.Plastic  -- Look clay-like, simples e boost FPS
+            end
+        end
+        
         FPSButton.Text = "Desativar FPS Boost"
     else
         settings().Rendering.QualityLevel = originalQuality
         Lighting.GlobalShadows = originalShadows
         Lighting.FogEnd = originalFogEnd
         Lighting.Brightness = originalBrightness
+        Lighting.EnvironmentDiffuseScale = originalEnvironmentDiffuse
+        Lighting.EnvironmentSpecularScale = originalEnvironmentSpecular
+        Lighting.ShadowSoftness = originalShadowSoftness
         -- Restaura efeitos
         for effect, enabled in pairs(originalEffects) do
             if effect.Parent then
                 effect.Enabled = enabled
             end
         end
+        -- Restaura materiais originais
+        for part, mat in pairs(originalMaterials) do
+            if part.Parent then
+                part.Material = mat
+            end
+        end
         originalEffects = {}
+        originalMaterials = {}
         FPSButton.Text = "Ativar FPS Boost"
     end
 end)
 
--- Botão Tela Esticada
+-- Botão Tela Esticada (arredondado + stretch matrix para simular 4:3 esticado como 1024x768)
 local StretchButton = Instance.new("TextButton")
 StretchButton.Name = "StretchButton"
 StretchButton.Parent = MainFrame
@@ -120,34 +165,37 @@ StretchButton.Text = "Tela Esticada"
 StretchButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 StretchButton.TextSize = 12
 
+local StretchCorner = Instance.new("UICorner")
+StretchCorner.CornerRadius = UDim.new(0, 5)
+StretchCorner.Parent = StretchButton
+
+local Camera = workspace.CurrentCamera
 local stretchActive = false
-local originalFOV = workspace.CurrentCamera.FieldOfView
-local fovConnection
+local stretchConnection
+
 StretchButton.MouseButton1Click:Connect(function()  -- Mudei pra MouseButton1Click
     stretchActive = not stretchActive
     if stretchActive then
-        originalFOV = workspace.CurrentCamera.FieldOfView
-        if fovConnection then
-            fovConnection:Disconnect()
+        if stretchConnection then
+            stretchConnection:Disconnect()
         end
-        workspace.CurrentCamera.FieldOfView = 110
-        fovConnection = RunService.Heartbeat:Connect(function()
+        local Resolution = 0.75  -- Fator para simular 4:3 esticado em tela widescreen (1024x768)
+        stretchConnection = RunService.RenderStepped:Connect(function()
             if stretchActive then
-                workspace.CurrentCamera.FieldOfView = 110
+                Camera.CFrame = Camera.CFrame * CFrame.new(0, 0, 0, 1, 0, 0, 0, Resolution, 0, 0, 0, 1)
             end
         end)
         StretchButton.Text = "Desativar Esticada"
     else
-        if fovConnection then
-            fovConnection:Disconnect()
-            fovConnection = nil
+        if stretchConnection then
+            stretchConnection:Disconnect()
+            stretchConnection = nil
         end
-        workspace.CurrentCamera.FieldOfView = originalFOV
         StretchButton.Text = "Tela Esticada"
     end
 end)
 
--- Botão Steal/TP
+-- Botão Steal/TP (arredondado)
 local TPButton = Instance.new("TextButton")
 TPButton.Name = "TPButton"
 TPButton.Parent = MainFrame
@@ -159,6 +207,10 @@ TPButton.Font = Enum.Font.SourceSans
 TPButton.Text = "Steal/TP para Player Mais Próximo"
 TPButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 TPButton.TextSize = 12
+
+local TPCorner = Instance.new("UICorner")
+TPCorner.CornerRadius = UDim.new(0, 5)
+TPCorner.Parent = TPButton
 
 TPButton.MouseButton1Click:Connect(function()  -- Mudei pra MouseButton1Click
     if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
@@ -178,7 +230,7 @@ TPButton.MouseButton1Click:Connect(function()  -- Mudei pra MouseButton1Click
     end
 end)
 
--- Botão Fechar
+-- Botão Fechar (arredondado)
 local CloseButton = Instance.new("TextButton")
 CloseButton.Name = "CloseButton"
 CloseButton.Parent = MainFrame
@@ -190,6 +242,10 @@ CloseButton.Font = Enum.Font.SourceSansBold
 CloseButton.Text = "X"
 CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 CloseButton.TextSize = 14
+
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(0, 5)
+CloseCorner.Parent = CloseButton
 
 CloseButton.MouseButton1Click:Connect(function()  -- Mudei pra MouseButton1Click
     MainFrame.Visible = false
@@ -224,4 +280,4 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
-print("Kauan Mods v1.9 carregado! Fix: Menu abre com toque no ⚡ (MouseButton1Click). FPS Boost agora escurece mais + desabilita post-effects pra boost real!")
+print("Kauan Mods v2.2 carregado! Correção: Tela Esticada agora usa matrix de stretch (0.75 vertical) para simular 4:3 esticado como 1024x768, sem zoom!")
